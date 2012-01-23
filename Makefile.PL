@@ -5,7 +5,18 @@ use ExtUtils::MakeMaker;
 WriteMakefile(
     NAME              => 'Finance::Quant',
     VERSION_FROM      => 'lib/Finance/Quant.pm', # finds $VERSION
-    PREREQ_PM         => {}, # e.g., Module::Name => 1.1
+    PREREQ_PM         => {"WWW::Mechanize"=>0,
+"Carp"=>0,
+"Data::Dumper"=>0,
+"File::Spec::Functions"=>0,
+"File::Path"=>0,
+"Time::Local"=>0,
+"File::Fetch"=>0,
+"File::Copy"=>0,
+"Finance::Optical::StrongBuy"=>0,
+"HTML::TreeBuilder"=>0,
+"Text::Buffer"=>0}
+, # e.g., Module::Name => 1.1
     ($] >= 5.005 ?     ## Add these new keywords supported since 5.005
       (ABSTRACT_FROM  => 'lib/Finance/Quant.pm', # retrieve abstract from module
        AUTHOR         => 'Hagen Geissler <santex@cpan.org>') : ()),

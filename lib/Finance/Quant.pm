@@ -17,7 +17,7 @@ use File::Find;
 
 use vars qw/$VERSION @directories @DATA %files $current @symbols $textbuffer $textview $dir $sources/;
 
-$VERSION = 0.01;
+$VERSION = 0.02;
 
                                 
 require Exporter;

@@ -13,6 +13,7 @@ WriteMakefile(
 "Time::Local"=>0,
 "File::Fetch"=>0,
 "File::Copy"=>0,
+"File::Find"=>0,
 "Finance::Optical::StrongBuy"=>0,
 "HTML::TreeBuilder"=>0,
 "Text::Buffer"=>0}

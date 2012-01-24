@@ -1,4 +1,4 @@
-Finance-Quant version 0.03
+Finance-Quant version 0.04
 ==========================
 
 The README is used to introduce the module and provide instructions on
@@ -36,11 +36,118 @@ OK   raid of Institutional Brokers Estimate System - for full strong buy Analysi
    enjoy
 
 
+=head1 NAME
+
+Finance::Qunat::Home - Generic envirorment for Qunatitative Analysis in finance
+
+=head1 SYNOPSIS
+
+
+=head1 DESCRIPTION
+
+Basic structure to start qunatitative reasearch in finance
+
+providing 
+    
+   historycle directory structure
+   Fresh symbols
+   More symbols
+   raid of Institutional Brokers Estimate System - for full strong buy Analysis
+   Time-series envirorment
+   R quantstrat plotting sandbox
+   R back-test sandbox
+
+   enjoy
+    
+
+
+=head2 EXPORT
+
+None by default.
+
+=head2 More
+
+use strict;
+use warnings;
+use Data::Dumper;
+use Finance::Quant;
+use Time::HiRes qw(usleep);
+
+
+
+  # GETS ONE
+  
+  my ($symbol,$self,$recommended,$home) = ('GOOG',undef,undef,undef,{});
+         
+  #single custom symbol
+  $self = Finance::Quant->new($symbol);
+  
+  $home = $self->Home($self->{config});
+
+  #search data 
+  my $textbuffer = $self->do_dir_search($symbol);
+  
+  print Dumper [$symbol,$self,$home,$textbuffer];
+
+
+=head1 RECOMMENDED
+
+  # GETS ALL 
+  my $self = Finance::Quant->recommended;
+
+
+  print Dumper [$self->{config}];
+
+
+  my $home = $self->Home($self->{config});
+
+  print Dumper [$self->{config}];
+
+
+  print Dumper [$self,$home];
+
+
+=head1 SEE ALSO
+
+Finance::Google::Sector::Mean
+Finance::NASDAQ::Markets
+
+=head1 AUTHOR
+
+Hagen Geissler
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (C) 2012 by Hagen Geissler
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself, either Perl version 5.12.4 or,
+at your option, any later version of Perl 5 you may have available.
+
+
+=cut
+
+
+
 DEPENDENCIES
+
+
 
 This module requires these other modules and libraries:
 
-  blah blah blah
+  use  WWW::Mechanize; 
+  use Carp;
+  use Data::Dumper;
+  use File::Spec::Functions;
+  use File::Path;
+  use Time::Local;
+  use File::Fetch;
+  use File::Copy;
+  use Finance::Optical::StrongBuy;
+  use HTML::TreeBuilder;
+  use Text::Buffer;
+  use File::Find; 
+
 
 COPYRIGHT AND LICENCE
 

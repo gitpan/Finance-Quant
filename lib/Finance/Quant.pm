@@ -11,13 +11,12 @@ use strict;
 use warnings;
 no warnings 'redefine';
 no warnings 'utf8';
-use File::Find; 
 
 #my($recurse  $name  $case $linenums $quick_start  $use_regex  $linenums  $textbuffer  $seeking  $cancel  $f1_label  $textbuffer  $entry  $seeking)
 
 use vars qw/$VERSION @directories @DATA %files $current @symbols $textbuffer $textview $dir $sources/;
 
-$VERSION = 0.03;
+$VERSION = 0.04;
 
                                 
 require Exporter;
@@ -32,7 +31,7 @@ use File::Copy;
 use Finance::Optical::StrongBuy;
 use HTML::TreeBuilder;
 use Text::Buffer;
-
+use File::Find; 
 our @ISA       = qw(Exporter);
 our @EXPORT_OK = qw/Homex/;
 
@@ -80,7 +79,7 @@ sub recommended {
     my $self = $class->new($config);
 
        
-       $self->{config}->{'ibes'} = {SP500=>1,NYSE=>0,AMEX=>0,NASDAQ=>0,CUSTOM=>1},
+       $self->{config}->{'ibes'} = {SP500=>1,NYSE=>1,AMEX=>0,NASDAQ=>1,CUSTOM=>1},
        $self->{config}->{'sector-data'}         = 1;
        $self->{config}->{'markets'}             = 1;
        $self->{config}->{'yahoo-charts'}        = 1;
@@ -751,20 +750,45 @@ None by default.
 
 =head2 More
 
-           use strict;
-           use warnings;
-           use Data::Dumper;
-           use threads;
-           use Thread::Queue;
+use strict;
+use warnings;
+use Data::Dumper;
+use Finance::Quant;
+use Time::HiRes qw(usleep);
 
-           my $q = Thread::Queue->new();    # A new empty queue
 
-           # Worker thread
-           my $thr = threads->create(sub {
-                                       while (my $item = $q->dequeue()) {
-                                           # Do work on $item
-                                       }
-                                    })->detach();
+
+  # GETS ONE
+  
+  my ($symbol,$self,$recommended,$home) = ('GOOG',undef,undef,undef,{});
+         
+  #single custom symbol
+  $self = Finance::Quant->new($symbol);
+  
+  $home = $self->Home($self->{config});
+
+  #search data 
+  my $textbuffer = $self->do_dir_search($symbol);
+  
+  print Dumper [$symbol,$self,$home,$textbuffer];
+
+
+=head1 RECOMMENDED
+
+  # GETS ALL 
+  my $self = Finance::Quant->recommended;
+
+
+  print Dumper [$self->{config}];
+
+
+  my $home = $self->Home($self->{config});
+
+  print Dumper [$self->{config}];
+
+
+  print Dumper [$self,$home];
+
 
 =head1 SEE ALSO
 

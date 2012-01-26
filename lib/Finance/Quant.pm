@@ -1,25 +1,41 @@
-# Data/Dumper.pm
-#
-# convert perl data structures into perl syntax suitable for both printing
-# and eval
-#
-# Documentation at the __END__
-#
-
 package Finance::Quant;
+use 5.012004;
 use strict;
 use warnings;
-no warnings 'redefine';
-no warnings 'utf8';
 
 #my($recurse  $name  $case $linenums $quick_start  $use_regex  $linenums  $textbuffer  $seeking  $cancel  $f1_label  $textbuffer  $entry  $seeking)
 
 use vars qw/$VERSION @directories @DATA %files $current @symbols $textbuffer $textview $dir $sources/;
 
-$VERSION = 0.04;
+use LWP::UserAgent;
 
-                                
 require Exporter;
+
+our @ISA = qw(Exporter);
+
+# Items to export into callers namespace by default. Note: do not export
+# names by default without a very good reason. Use EXPORT_OK instead.
+# Do not simply export all your public functions/methods/constants.
+
+# This allows declaration	use Finance::Quant::Quotes ':all';
+# If you do not need this, moving things directly into @EXPORT or @EXPORT_OK
+# will save memory.
+our %EXPORT_TAGS = ( 'all' => [ qw(
+	
+) ] );
+
+our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
+
+
+our @EXPORT = qw(
+new recommended Home updateSymbols
+);
+
+our $VERSION = '0.05';
+
+no warnings 'redefine';
+no warnings 'utf8';
+                                
 use  WWW::Mechanize; 
 use Carp;
 use Data::Dumper;
@@ -32,8 +48,6 @@ use Finance::Optical::StrongBuy;
 use HTML::TreeBuilder;
 use Text::Buffer;
 use File::Find; 
-our @ISA       = qw(Exporter);
-our @EXPORT_OK = qw/Homex/;
 
 our @directories = qw(download ibes-strong-buy ratings symbols charts);
 
@@ -78,6 +92,8 @@ sub recommended {
     
     my $self = $class->new($config);
 
+    $self->createDataDir();
+
        
        $self->{config}->{'ibes'} = {SP500=>1,NYSE=>1,AMEX=>0,NASDAQ=>1,CUSTOM=>1},
        $self->{config}->{'sector-data'}         = 1;
@@ -89,7 +105,6 @@ sub recommended {
 
 
 
-    $self->createDataDir();
 
     $self->_init();
 
@@ -97,7 +112,10 @@ sub recommended {
 
 }
 
-
+sub updateSymbols {
+    my $self = shift;
+    $self->getNasdaqSymbols(File::Spec->tmpdir(),"ftp://ftp.nasdaqtrader.com/symboldirectory/nasdaqlisted.txt");
+}
 sub _init{
 
     my $self = shift;
@@ -116,7 +134,7 @@ sub _init{
          $self->{config}->{'ibes'}->{$_->[0]} = $_->[1];
 
          if($_->[0] eq "NASDAQ"){
-            $self->{config}->{'ibes'}->{NASDAQ}=sprintf $self->getNasdaqSymbols(File::Spec->tmpdir(),"ftp://ftp.nasdaqtrader.com/symboldirectory/nasdaqlisted.txt");
+            $self->{config}->{'ibes'}->{NASDAQ}=$self->updateSymbols();
          }
 
       }
@@ -141,11 +159,7 @@ sub new {
     my $class = shift;
     my $symbol = shift;
 
-    croak "need a symbol! perhaps you should use Finance::Quant->recommended" unless($symbol);
 
-    
-
-    
     my $self = bless {
         
         config=>{'ibes'=>{CUSTOM=>$symbol}},
@@ -305,8 +319,8 @@ sub Home {
 
   
   my $self = shift;
-  
 
+    
   my $config = $self->{config};
 
 
@@ -322,7 +336,7 @@ sub Home {
   $self->{today}->{$dir}->{$downfolder} = [@directories];  
   $self->{date} = $date;
    
-    if( defined $dir ) {
+    if( defined($dir)) {
         	
 
         chdir($dir);
@@ -362,7 +376,9 @@ sub Home {
       chdir("..");
 
     
-    my @ok = keys %{$self->{optical}->{'result'}};
+   }
+    
+   my @ok = keys %{$self->{optical}->{'result'}};
 
 
     my $ff = undef;
@@ -396,11 +412,7 @@ sub Home {
 
     chdir("..");
 
-   }else{
-        croak "need a working directory";
-    }
-
-    
+   
 
     return $self;
 }
@@ -719,6 +731,7 @@ __DATA__
 __END__
 
 
+
 =head1 NAME
 
 Finance::Qunat::Home - Generic envirorment for Qunatitative Analysis in finance
@@ -809,3 +822,4 @@ at your option, any later version of Perl 5 you may have available.
 
 
 =cut
+

@@ -1,5 +1,4 @@
 package Finance::Quant;
-use 5.012004;
 use strict;
 use warnings;
 
@@ -31,7 +30,7 @@ our @EXPORT = qw(
 new recommended Home updateSymbols
 );
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 no warnings 'redefine';
 no warnings 'utf8';
@@ -44,7 +43,11 @@ use File::Path;
 use Time::Local;
 use File::Fetch;
 use File::Copy;
+use Finance::Quant::Quotes;
+use Finance::Quant::Charter;
 use Finance::Optical::StrongBuy;
+use Finance::Google::Sector::Mean;
+use Finance::NASDAQ::Markets;
 use HTML::TreeBuilder;
 use Text::Buffer;
 use File::Find; 
@@ -66,23 +69,6 @@ our $sources = {
       NASDAQ_SYMBOLS       => "http://chart.finance.yahoo.com/z?s=%s&t=3m&q=c&l=on&z=l&p=b,p,v,m20&a=m26-12-9&lang=en-US&region=US"
     };
                     
-
-## ACTIVATE FLAGS AND ERASE THEM FROM @ARGV... 
- 
-if( grep{/\bn\b/} @ARGV ){@ARGV = grep { $_ ne 'n' } @ARGV; $name = 1 }; 
-if( grep{/\br\b/} @ARGV ){@ARGV = grep { $_ ne 'r' } @ARGV; $recurse = 1 }; 
-if( grep{/\bR\b/} @ARGV ){@ARGV = grep { $_ ne 'R' } @ARGV; $use_regex = 1 }; ##<patch 
-if( grep{/\bc\b/} @ARGV ){@ARGV = grep { $_ ne 'c' } @ARGV; $case = 1 }; 
-
- 
-$linenums = 1; #opened file line numbering is on by default 
-my $search_str = $ARGV[0] or $quick_start = 1; 
-$search_str ||= undef; 
-
-our $dir = File::Spec->tmpdir();
-
-chdir($dir) if (defined($dir) and -d $dir); 
-chdir($current) if (defined($current) and -d $current); 
 1;
 
 sub recommended {
@@ -91,11 +77,8 @@ sub recommended {
     my $config = {};
     
     my $self = $class->new($config);
-
-    $self->createDataDir();
-
        
-       $self->{config}->{'ibes'} = {SP500=>1,NYSE=>1,AMEX=>0,NASDAQ=>1,CUSTOM=>1},
+       $self->{config}->{'ibes'} = {SP500=>1,NYSE=>1,AMEX=>1,NASDAQ=>1,CUSTOM=>0},
        $self->{config}->{'sector-data'}         = 1;
        $self->{config}->{'markets'}             = 1;
        $self->{config}->{'yahoo-charts'}        = 1;
@@ -104,6 +87,9 @@ sub recommended {
        $self->{config}->{'nasdaq-guru-rating'}  = 1;
 
 
+
+
+    $self->createDataDir();
 
 
     $self->_init();
@@ -188,6 +174,7 @@ $self->{config}->{sources} = {
 
     $self->{textbuffer} = new Text::Buffer(-file=>'my.txt');
     
+
 
     return $self;
 }
@@ -321,10 +308,12 @@ sub Home {
   my $self = shift;
 
     
-  my $config = $self->{config};
+  my $config = shift;
 
+    $config = $self->{config} unless($config);
 
   
+#  createDataDir();
     
   my $dir = File::Spec->tmpdir();
   my $date = gmtime;
@@ -341,20 +330,13 @@ sub Home {
 
         chdir($dir);
 
-        File::Path::mkpath($current);
-
         chdir($current);
         File::Path::mkpath($downfolder);
        
         chdir($downfolder);
 
 	
-        File::Path::mkpath(@directories, {
-                 verbose => 1,
-                 mode => 0711,
-             } );
-
-
+    
           #$self->{NYSE}->{timer}=time;
 
           
@@ -367,9 +349,9 @@ sub Home {
 
 
 
-        foreach(keys %{$self->{config}->{ibes}}) {
+        foreach(keys %{$config->{ibes}}) {
           
-            $self->Download($self->{config}->{ibes}->{$_});
+            $self->Download($config->{ibes}->{$_});
 
        }
 
@@ -399,7 +381,8 @@ sub Home {
       
         $ff = $self->get_source_image(sprintf("http://content.nasdaq.com/ibes/%s_Smallcon.jpg",$sym ));
         $self->writeFile($ff,sprintf("ibes-strong-buy/%s.jpg",$sym ));
-
+        
+        
         $ff = $self->get_source_image(sprintf("http://chart.finance.yahoo.com/z?s=%s&t=3m&q=c&l=on&z=l&p=b,p,v,m20&a=m26-12-9&lang=en-US&region=US",$sym ));
         $self->writeFile($ff,sprintf("charts/%s.png",$sym ));
         $self->{$dir}->{$downfolder}->{'charts'}->{$sym}= sprintf("%s/%s/%s/charts/%s.png",$dir,$current,$downfolder,$sym);

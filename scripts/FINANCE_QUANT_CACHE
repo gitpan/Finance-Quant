@@ -1,0 +1,466 @@
+#!/usr/bin/perl
+
+use strict;
+use File::Find;
+use Getopt::Long;
+use Storable qw(lock_retrieve lock_store);
+use Data::Dumper;
+use File::Spec;
+use Cache::Memcached;
+use Finance::Quant;
+use IO::Capture::Stdout;
+use XML::Simple;
+use Statistics::Basic qw(mean);
+use File::Basename;
+
+my @modules;
+my $CACHE_VERSION = 1;
+my $VERSION = "1.03";
+my $backtest = {};
+my @tested=();
+
+my$dir = File::Spec->tmpdir();
+
+chdir($dir);
+# return only matching modules
+sub wanted { 
+
+
+/longtrend_backtest[_](.*).data$/ && push @tested,[$1,$File::Find::name];
+#   /^*ownload(.*)Smallcon.jpg$/ && push @tested,[$1,$File::Find::name];
+
+}
+my @looking = ["Finance::Quant","Finance::Optical","Finance::Google","Finance::NASDAQ"];
+# look in the @IRC dirs that exist
+find(\&wanted, grep { -r and -d } @INC);
+
+#print Dumper @tested;
+
+# nice printout
+foreach (@tested) {
+  $backtest->{$_->[0]}=[$_->[1]];
+# print "$_->[0] $_->[1]\n";
+}
+
+
+my %opts = (
+            timeout       => 24*60*60,
+            max_cache_age => 1,
+            backrole=>0,
+            cache_file    => "~/.getquotes_cache",
+            cache         => 1,
+            backdate      => "",
+            datelastbuys=>"",
+            ob=>"",
+           );
+
+GetOptions (\%opts,
+            "timeout=i",
+            "cache!",
+            "datelastbuys=s",
+            "ob=s",
+            "max_cache_age=i",
+            "backrole=i",
+            "backdate=s",
+            "cache_file=s");
+
+
+$opts{dayoffweek}=`date +"%u"`;
+
+
+if($opts{dayoffweek} gt 5 || $opts{dayoffweek} eq 1){
+    $opts{lastbuisday}="last friday";
+    $opts{backrole} = 2;
+}else{
+    $opts{lastbuisday}="yesterday";
+    $opts{backrole} = 1;
+}
+    $opts{backdate} = trim(`date --date=$opts{backrole}" days ago" +%Y-%m-%d`);
+
+
+$opts{cache_file} = tildeexp($opts{cache_file});
+
+
+my$capture = IO::Capture::Stdout->new();
+my $memd = new Cache::Memcached {
+'servers' => [ "127.0.0.1:11211"],
+'debug' => 0,
+'compress_threshold' => 10_000,
+} or warn($@);
+
+my @symbols = @ARGV;
+
+  my $self = $memd->get("master-run");
+
+#  $memd->set("symbols_key",[keys %{$self->{result}}]);
+
+  @symbols =  @{$memd->get("master-run-SYMBOLS")};
+
+  @symbols = map {uc} @symbols;
+
+  $opts{ob} .= sprintf $#symbols;
+
+my $cache = {};
+eval {
+  $cache = lock_retrieve($opts{cache_file});
+};
+#$cache = {};
+$cache = {} unless
+  $cache->{CACHE_VERSION} and $cache->{CACHE_VERSION} !~ m/\D/
+  and $cache->{CACHE_VERSION} == $CACHE_VERSION;
+
+refetch($cache, @symbols)
+  unless $opts{cache} == 1 and
+  check_cache($cache, @symbols);
+
+
+
+
+#   0 Symbol
+#   1 Company Name
+#   2 Last Price
+#   3 Last Trade Date
+#   4 Last Trade Time
+#   5 Change
+#   6 Percent Change
+#   7 Volume
+#   8 Average Daily Vol
+#   9 Bid
+#  10 Ask
+#  11 Previous Close
+#  12 Today's Open
+#  13 Day's Range
+#  14 52-Week Range
+#  15 Earnings per Share
+#  16 P/E Ratio
+#  17 Dividend Pay Date
+#  18 Dividend per Share
+#  19 Dividend Yield
+#  20 Market Capitalization
+#  21 Stock Exchange
+
+
+      $opts{ob} .= sprintf("\n****************************************************************************************************************\n\nQUOTES\n\n****************************************************************************************************************\n");
+
+my $coreData = "";
+
+$cache->{ranking}={};
+for my $symbol (@symbols) {
+  my $q = $cache->{$symbol}->{data};
+  my $core = $cache->{$symbol}->{core};
+  
+
+#       next unless (defined($core->{result}[0]) && $core->{result}[0] eq"");
+      my $r = @{$symbol,$core->{quote}->{result}}[0];
+      
+      
+      my @r = split("\n",$r);
+      
+      foreach(@r){
+#        print "\n$_" unless($_ !~/[\[]*[\]].*2012-02-09/);
+         $cache->{$symbol}->{ordering}=$_ unless($_ !~/^[\[]1[\]]/);
+      }
+      @r = split(" ",$r[$#r]);
+      
+      $cache->{ranking}->{$r[2]}=$symbol unless($r[2] <10000);
+#      $coreData .= "\n$symbol=". Dumper $core;
+
+
+      #print "No symbol $symbol\n" and next unless ($q);
+      $opts{ob} .= sprintf "%-5s %6.2f %6.2f %6.2f%% - %10s %10s\t%10s\t(%10s)\t(%s)\n", $q->[0], $q->[2], $q->[5], $q->[6], $q->[3], $q->[4] , $core->{position}, lc $q->[1],"<BACKTEST>";
+  }
+
+
+      my @keys = reverse sort { $a <=> $b  }  keys %{$cache->{ranking}};
+      
+ #   print Dumper @keys;  
+      
+      $opts{ob} .= sprintf("\n********************************************************\********************************************************\n\nORDERS %s\n\n****************************\************************************************************************************\n",$opts{backdate});
+      
+ foreach (@keys) { 
+ 
+    my $sym = $cache->{ranking}->{$_};
+    
+    $cache->{$sym}->{ordering} = "" unless ($cache->{$sym}->{ordering});
+   
+    next unless ($cache->{$sym}->{ordering}=~ m/$opts{backdate}/);
+   
+    if($cache->{$sym}->{ordering} =~ m/$sym -/){
+    $cache->{$sym}->{ordering} = "SELL>".$cache->{$sym}->{ordering};
+    }elsif($cache->{$sym}->{ordering} =~ m/$sym/){
+    
+      $cache->{$sym}->{ordering} = "BUY>".$cache->{$sym}->{ordering};
+    }else{
+          $cache->{$sym}->{ordering} = ">".$cache->{$sym}->{ordering};
+    }
+#     
+         $opts{ob} .= sprintf("\n%d %s %s  %s %s %s %s",$_,$sym,
+                                          $cache->{$sym}->{core}->{position},
+                                          $cache->{$sym}->{core}->{"guru-sum"},
+                                          $cache->{$sym}->{core}->{"momentum"},$cache->{$sym}->{ordering}); 
+                                          
+  
+#      }                                          
+                                          
+}
+
+
+sub trim
+{
+	my $string = shift;
+
+  $string = "" unless($string);
+	$string =~ s/^\s+//;
+	$string =~ s/\s+$//;
+	return $string;
+}
+
+
+# return only matching modules
+sub wantedx { 
+
+
+   /^F*(Market|Quant|Quant*Home|NASDAQ|Optical).*\.pm$/ && push @modules, $File::Find::name;
+  
+}
+
+
+sub searchModule{
+
+    my @return = ();
+    # look in the @IRC dirs that exist
+    find(\&wantedx, grep { -r and -d } @INC);
+
+
+
+    # de-dupe
+    my %saw;
+    @modules = grep(!$saw{$_}++, @modules);
+
+    # strip extraneous directories off the modules
+    for my $prefix ( sort { length $b <=> length $a } @INC ) {
+      for (@modules) { 
+          next unless($_ =~ /Finance/);
+          next if s/^\Q$prefix// 
+       }
+    }
+
+    
+    return  \@return;
+}
+
+
+
+sub DirContent ($ $)
+{
+    my ( $path,$id ) = @_;
+
+     warn "$id: $path\n";
+
+    local *DIR;
+
+    unless ( opendir DIR, $path )
+    {
+    	print "$id: can't read $path $@";
+    }
+
+    my @tmp = readdir DIR;
+    closedir DIR;
+
+    my @results = ();
+    foreach(@tmp){
+          next if($_ eq "." || $_ eq "..");
+          
+         if($_ =~ /$id/){
+           push @results,$_;
+         }
+         
+    }
+
+    return @results;
+}
+
+
+sub refetch {
+  my ($cache, @symbols) = @_;
+  eval {
+    local $^W = 0;  # because Finance::YahooQuote doesn't pass
+                    # warnings with 5.6.0.
+    require Finance::YahooQuote;
+    import  Finance::YahooQuote;
+    $Finance::YahooQuote::TIMEOUT = $Finance::YahooQuote::TIMEOUT = $opts{timeout};
+    
+  };
+
+  die qq[\nYou need to install the Finance::YahooQuote module\n\nTry\n\n  perl -MCPAN -e 'install "Finance::YahooQuote"'\n\nas root\n\n]
+        if $@ =~ /locate Finance/;
+  die $@ if $@;
+
+  my @q = getquote(@symbols);
+  for my $q (@q) {
+    my $symbol = $q->[0];
+    if ($q->[1] eq $symbol) {
+      $q = undef;
+    } else {
+      $q->[6] =~ s/%$//;
+    }
+    $cache->{$symbol}->{time} = time;
+    $cache->{$symbol}->{data} = $q;
+    
+    
+my $quote = {};
+
+
+$quote = {"symbol"	=>	$q->[0],
+"CompanyName"	=>	$q->[1],
+"LastPrice"	=>	$q->[2],
+"LastTradeDate"	=>	$q->[3],
+"LastTradeTime"	=>	$q->[4],
+"PercentChange"	=>	$q->[5],
+"Volume"	=>	$q->[7],
+"AverageDailyVol"	=>	$q->[8],
+"PreviousClose"	=>	$q->[11],
+"Open"	=>	$q->[12],
+"DayRange"	=>	$q->[13],
+"52-WeekRange"	=>	$q->[14],
+"MarketCapitalization"	=>	$q->[20],
+"result"	=>	[readFile(@{$backtest->{$q->[0]}})]
+};
+
+    $cache->{$symbol}->{core} = getCore($symbol,$quote);
+    
+    
+    
+  }
+  $cache->{CACHE_VERSION} = $CACHE_VERSION;
+  lock_store($cache, $opts{cache_file});
+}
+
+sub check_cache {
+  my ($cache, @symbols) = @_;
+  # check that all symbols are fresh enough
+  for my $symbol (@symbols) {
+    unless ($cache->{$symbol}->{time}
+            and $cache->{$symbol}->{time} > time-$opts{max_cache_age}) {
+
+      # XXX .. cache cleaning should work
+     # for my $symbol (keys %{$cache}) {
+        #if ($cache->{$symbol}->{time} < time-($opts{max_cache_age}*20)) {
+        #  delete $cache->{$symbol};
+       # }
+     # }
+
+      return 0;
+    }
+  }
+  return 1;
+}
+
+
+
+
+sub getCore{
+
+  my ($symbol,$data) = @_;
+  my $homex = $self->{result}->{$symbol}->{extended};
+     $homex->{quote}=$data;
+     
+      my @tested = ();
+      $symbol = "" unless($symbol);
+
+     /longtrend_backtest[_]$symbol.data$/ && push @tested,[$1,$File::Find::name];
+  
+  return $homex;
+
+}
+
+
+sub readFile {
+  my($filename) = @_;
+  my(@lines);
+
+  my $details = {};
+  my $ret = "";
+  if(!defined($filename) ) {
+    return [];
+
+  }
+  my @array=();
+  
+  open(IN, $filename) or die "Error: couldn't open file $filename : $!\n";
+  @lines = <IN>;
+  
+     foreach my $line(@lines){
+        
+        next unless($line =~/Net|Tx|2012-02/);
+        $ret .= $line;
+        push @array,$line;
+        
+   
+    }
+  
+  close(IN);
+   
+  return $ret;#@array
+}
+
+
+sub tildeexp {
+  my $path = shift;
+  $path =~ s{^~([^/]*)} {  
+          $1 
+                ? (getpwnam($1))[7] 
+                : ( $ENV{HOME} || $ENV{LOGDIR} || (getpwuid($>))[7])
+          }ex;
+  return $path;
+}
+
+
+
+#my $xml = XML::Simple::XMLout($cache);
+
+#open (XML,">a");
+#print XML $xml;
+#close (XML);
+
+      $opts{ob} .= sprintf $coreData;
+
+      printf $opts{ob};
+
+=head1 NAME
+
+getquotes - get quotes from Yahoo Finance.
+
+=head1 SYNOPSIS
+
+  getquotes
+       (gets the default quotes)
+
+  getquotes YHOO VCLK ANDN 
+       (get quotes for Yahoo, ValueClick and Andover Net)
+
+  getquotes --nocache
+       (don't use the cache)
+
+  getquotes --max_cache_age=600 YHOO
+       (cache is valid for 10 minutes (default is 5*60 seconds))
+
+  getquotes --cache_file=/tmp/cache
+       (alternate cache file (default ~/.getquotes.cache))
+
+  getquotes --timeout 10
+       (timeout after 10 seconds instead of the default 3)
+
+
+=head1 TODO
+
+More clued documentation. :)
+
+--help option.
+
+Cache cleanup.
+
+=head1 COPYRIGHT
+
+
+

@@ -1,0 +1,62 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+use diagnostics;
+use Storable;
+use Data::Dumper;
+no warnings 'redefine';
+use Finance::Quant;
+use Test;
+use Time::HiRes qw(usleep);
+use Cache::Memcached;
+BEGIN { plan tests => 42 }
+
+my @symbols = ();
+
+###################
+#DONE DATA GOES TO TMP DIRECTORY
+my $self = Finance::Quant->recommended;
+print Dumper [$self->{config}];
+$self->Home();
+@symbols = keys %{$self->{result}} unless(!defined($self->{result}));
+
+store $self, 'master-run';
+store $self, 'master-run-BACKUP';
+store {'master-run-SYMBOLS'=>\@symbols}, 'master-run-SYMBOLS';
+# $self = retrieve('master-run-BACKUP');
+
+#I have 1GB ASSIGNED CONTAINS ALSO THE CSV OF 1 YEAR DATA OF 8000 STOCKS FROM YAHOO
+my $memd = new Cache::Memcached {
+	'servers' => [ "127.0.0.1:11211"],
+	'debug' => 0,
+	'compress_threshold' => 10_000,
+} or warn($@);
+
+$memd->set("master-run",$self);
+$memd->set("master-run-BACKUP",$self);
+$memd->set("master-run-SYMBOLS",\@symbols);
+
+@symbols = $memd->get("master-run-SYMBOLS");
+
+print Dumper [ $self,@symbols ];
+
+
+
+END  {
+`FINANCE_QUANT_R_CMD`;
+
+`FINANCE_QUANT_CACHE`;
+
+  exit(0);
+}
+
+
+1;
+__DATA__
+
+	 
+#HERE WAYS TO KEEP DATA UNDER CONTROLL AND MINIMIZE RECALCULATION
+
+1;
+__DATA__
+#system('for i in `ls /tmp/Finance-Quant/2012-Jan-27-Fri/ibes-strong-buy/ | replace ".jpg" ""`; do perl ~/myperl/charter.pm $i; done');

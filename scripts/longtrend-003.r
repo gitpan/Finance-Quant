@@ -28,6 +28,8 @@ require(quantmod)
 require(TTR)
 require(blotter)
 
+
+
 # Try to clean up in case the demo was run previously
 try(rm("account.longtrend","portfolio.longtrend",pos=.blotter),silent=TRUE)
 try(rm("ltaccount","ltportfolio","ClosePrice","CurrentDate","equity","AAPL","i","initDate","initEq","Posn","UnitSize","verbose"),silent=TRUE)

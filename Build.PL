@@ -12,6 +12,7 @@ my $build = Module::Build->new(
     'GD'                  => 0,
     'Test::More'       => 0,
     'Carp'=>0,
+    'Text::Reform'    =>0,
     'Data::Dumper'			=>0,
     'File::Spec::Functions'		=>0,
     'File::Path'			=>0,
@@ -20,22 +21,33 @@ my $build = Module::Build->new(
     'File::Copy'			=>0,
     'File::Find'			=>0,
     'Finance::Optical::StrongBuy'	=>0,
+    'Finance::Quant::Symbols' =>0,
     'Finance::Google::Sector::Mean'	=>0,
     'Finance::NASDAQ::Markets'	=>0,
     'HTML::TreeBuilder'		=>0,
     'Text::Buffer'			=>0,
     'WWW::Mechanize'=>0,
-    'GraphViz'=>0
+    'GraphViz'=>0,
+    'List::Util'=>0,
+    'MIME::Base64'=>0,
+    'GD::Graph::lines'=>0,
+    'Statistics::Basic'=>0,
+    'Thread::Queue'=>0,
+    'Cache::Memcached'=>0,
+    'LWP::UserAgent'=>0,
+
     },
     recommends        => {
     },
-   
+
+
  script_files => [
                         'scripts/financequant',
                         'scripts/FINANCE_QUANT_HTTP_SERVER',
                         'scripts/FINANCE_QUANT_CREATE_DB',
                         'scripts/FINANCE_QUANT_R_CMD',
                         'scripts/FINANCE_QUANT_RECOMMENDED',
+                        'scripts/FINANCE_QUANT_RESTORE',
                         'scripts/FINANCE_QUANT_SORT_MARKETS',
                         'scripts/FINANCE_QUANT_TEST_INSTALL',
                         'scripts/FINANCE_QUANT_VGREP',
@@ -52,8 +64,7 @@ my $build = Module::Build->new(
 
  
        example_files => [
-			'example/data-http-server.html',
-			'example/data-tree.html'
+			'libdoc/'
     ],
     create_makefile_pl => 'passthrough',
     build_class        => 'Module::Build',

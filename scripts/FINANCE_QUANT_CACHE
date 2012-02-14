@@ -1,5 +1,4 @@
-#!/usr/bin/perl
-
+#!/usr/bin/perl -X
 use strict;
 use File::Find;
 use Getopt::Long;
@@ -8,32 +7,21 @@ use Data::Dumper;
 use File::Spec;
 use Cache::Memcached;
 use Finance::Quant;
-use IO::Capture::Stdout;
 use XML::Simple;
 use Statistics::Basic qw(mean);
 use File::Basename;
+use Text::Reform;
 
 my @modules;
 my $CACHE_VERSION = 1;
 my $VERSION = "1.03";
 my $backtest = {};
 my @tested=();
-
+my $cache = {};
+my $master = {};
 my$dir = File::Spec->tmpdir();
-
+my $home = "/home/hagen/myperl/Finance-Quant/";
 chdir($dir);
-# return only matching modules
-sub wanted { 
-
-
-/longtrend_backtest[_](.*).data$/ && push @tested,[$1,$File::Find::name];
-#   /^*ownload(.*)Smallcon.jpg$/ && push @tested,[$1,$File::Find::name];
-
-}
-my @looking = ["Finance::Quant","Finance::Optical","Finance::Google","Finance::NASDAQ"];
-# look in the @IRC dirs that exist
-find(\&wanted, grep { -r and -d } @INC);
-
 #print Dumper @tested;
 
 # nice printout
@@ -43,12 +31,21 @@ foreach (@tested) {
 }
 
 
+sub cmd{
+
+  system(sprintf("beancounter ",join " ",@_));
+
+}
 my %opts = (
-            timeout       => 24*60*60,
+            timeout       => 24*60*60*1,
             max_cache_age => 1,
             backrole=>0,
-            cache_file    => "~/.getquotes_cache",
+            latesunday=>1,
+            orders_file    => "~/.orders_getquotes_cache",
+            export_file    => "~/.export_getquotes_cache",
+            cache_file    => "~/.cache_getquotes_cache",
             cache         => 1,
+            order         => 1,
             backdate      => "",
             datelastbuys=>"",
             ob=>"",
@@ -56,12 +53,16 @@ my %opts = (
 
 GetOptions (\%opts,
             "timeout=i",
+            "latesunday=i",
             "cache!",
+            "order!",
             "datelastbuys=s",
             "ob=s",
             "max_cache_age=i",
             "backrole=i",
             "backdate=s",
+            "export_file=s",
+            "orders_file=s",
             "cache_file=s");
 
 
@@ -75,13 +76,42 @@ if($opts{dayoffweek} gt 5 || $opts{dayoffweek} eq 1){
     $opts{lastbuisday}="yesterday";
     $opts{backrole} = 1;
 }
+
+    if($opts{latesunday}||1){ $opts{backrole}=3;}
     $opts{backdate} = trim(`date --date=$opts{backrole}" days ago" +%Y-%m-%d`);
 
 
-$opts{cache_file} = tildeexp($opts{cache_file});
+
+foreach(qw(orders cache export)){
+$opts{sprintf("%s_file",$_)} = tildeexp(sprintf("%s_file",$_));
+
+  if($_ !~/cache/){
+      $master->{$_} = getNode($opts{sprintf("%s_file",$_)});
+  }else {
+      $cache =  getNode($opts{sprintf("%s_file",$_)});
+
+  }
+
+}
+
+# return only matching modules
+sub wanted { 
 
 
-my$capture = IO::Capture::Stdout->new();
+      my $f = $File::Find::name;
+      $f =~ s/.\/Finance.*.backtest\///g;
+      my $pdf =~ $f;
+          $pdf =~ s/data/pdf/g;
+     /longtrend_backtest[_](.*).data$/ && ($master->{export}->{datafile}->{$1}=$f) && ($master->{export}->{pdf}->{$1}=$pdf);
+     
+#/longtrend_backtest[_](.*).data$/ &&   ($master->{export}->{datafile}->{$1}=$File::Find::name);
+#   /^*ownload(.*)Smallcon.jpg$/ && push @tested,[$1,$File::Find::name];
+
+}
+
+find(\&wanted, grep { -r and -d } @INC);
+
+
 my $memd = new Cache::Memcached {
 'servers' => [ "127.0.0.1:11211"],
 'debug' => 0,
@@ -90,7 +120,7 @@ my $memd = new Cache::Memcached {
 
 my @symbols = @ARGV;
 
-  my $self = $memd->get("master-run");
+my $self = $memd->get("master-run");
 
 #  $memd->set("symbols_key",[keys %{$self->{result}}]);
 
@@ -100,9 +130,15 @@ my @symbols = @ARGV;
 
   $opts{ob} .= sprintf $#symbols;
 
+
+
+sub getNode{
+
+  my $file = shift;
+
 my $cache = {};
 eval {
-  $cache = lock_retrieve($opts{cache_file});
+  $cache = lock_retrieve($file);
 };
 #$cache = {};
 $cache = {} unless
@@ -114,6 +150,9 @@ refetch($cache, @symbols)
   check_cache($cache, @symbols);
 
 
+  return $cache;
+
+}
 
 
 #   0 Symbol
@@ -151,10 +190,10 @@ for my $symbol (@symbols) {
   
 
 #       next unless (defined($core->{result}[0]) && $core->{result}[0] eq"");
-      my $r = @{$symbol,$core->{quote}->{result}}[0];
+      my @r = @{$symbol,$core->{quote}->{result}};
       
       
-      my @r = split("\n",$r);
+     @r = split("\n", shift @r);
       
       foreach(@r){
 #        print "\n$_" unless($_ !~/[\[]*[\]].*2012-02-09/);
@@ -167,12 +206,17 @@ for my $symbol (@symbols) {
 
 
       #print "No symbol $symbol\n" and next unless ($q);
-      $opts{ob} .= sprintf "%-5s %6.2f %6.2f %6.2f%% - %10s %10s\t%10s\t(%10s)\t(%s)\n", $q->[0], $q->[2], $q->[5], $q->[6], $q->[3], $q->[4] , $core->{position}, lc $q->[1],"<BACKTEST>";
+      my $name = lc $q->[1];
+      my  $and = length $name<14?"\t\t":"\t";
+      my $quote = sprintf "%-5s %6.2f %6.2f %6.2f%% - %10s %5s\t%4s\t(%s)%s%5s\n", $q->[0], $q->[2], $q->[5], $q->[6], $q->[3], $q->[4] , $core->{position},$name,$and,"<BACKTEST>";
+      $opts{ob} .= $quote; 
+      $master->{export}->{quotes}->{$q->[2]}=$quote; 
   }
 
 
       my @keys = reverse sort { $a <=> $b  }  keys %{$cache->{ranking}};
-      
+    
+      $master->{export}->{symbolsRanked},[@keys];
  #   print Dumper @keys;  
       
       $opts{ob} .= sprintf("\n********************************************************\********************************************************\n\nORDERS %s\n\n****************************\************************************************************************************\n",$opts{backdate});
@@ -184,21 +228,47 @@ for my $symbol (@symbols) {
     $cache->{$sym}->{ordering} = "" unless ($cache->{$sym}->{ordering});
    
     next unless ($cache->{$sym}->{ordering}=~ m/$opts{backdate}/);
+    
+    
+  my @order = split(" ",$cache->{$sym}->{ordering});
+   $cache->{$sym}->{ordering} =~ s/\@//g;
    
     if($cache->{$sym}->{ordering} =~ m/$sym -/){
     $cache->{$sym}->{ordering} = "SELL>".$cache->{$sym}->{ordering};
-    }elsif($cache->{$sym}->{ordering} =~ m/$sym/){
     
+    $cache->{orders}->{$sym}=$cache->{$sym}->{ordering};
+    }elsif($cache->{$sym}->{ordering} =~ m/$sym/){
+      
       $cache->{$sym}->{ordering} = "BUY>".$cache->{$sym}->{ordering};
+      
+       @order = split(" ",$cache->{$sym}->{ordering});
+
+      $cache->{orders}->{$sym}=$cache->{$sym}->{ordering};
+#        push @{$cache->{orders}->{$sym}},[@order];
+#       print Dumper @order;
+
+       
+       #`beancounte  delete $sym`;
+
+#       `beancounter  addportfolio $sym:$order[3]:USD`;
     }else{
           $cache->{$sym}->{ordering} = ">".$cache->{$sym}->{ordering};
     }
-#     
-         $opts{ob} .= sprintf("\n%d %s %s  %s %s %s %s",$_,$sym,
+
+         my $ob = sprintf("\n%d %s %s  %s %1.4f %s %s",$_,$sym,
                                           $cache->{$sym}->{core}->{position},
                                           $cache->{$sym}->{core}->{"guru-sum"},
                                           $cache->{$sym}->{core}->{"momentum"},$cache->{$sym}->{ordering}); 
-                                          
+          $master->{export}->{list}->{$sym} = join ".",@order;
+                    $master->{export}->{list}->{$sym} =~ s/\n//g;
+     
+     
+          if($opts{order} == 1)
+          {         
+            push @{$master->{orders}->{SELL}},$ob unless($ob !~/SELL/);
+            push @{$master->{orders}->{BUY}},$ob unless($ob !~/BUY/);
+          }
+          $opts{ob} .= $ob;
   
 #      }                                          
                                           
@@ -220,7 +290,7 @@ sub trim
 sub wantedx { 
 
 
-   /^F*(Market|Quant|Quant*Home|NASDAQ|Optical).*\.pm$/ && push @modules, $File::Find::name;
+   /^F*(Market|Quant|Quant*Home|NASDAQ|Optical).*\.pm$/ && ($master->{export}->{datafile}->{$1}=$File::Find::name)
   
 }
 
@@ -327,7 +397,7 @@ $quote = {"symbol"	=>	$q->[0],
 "result"	=>	[readFile(@{$backtest->{$q->[0]}})]
 };
 
-    $cache->{$symbol}->{core} = getCore($symbol,$quote);
+    $cache->{$symbol}->{core} = getCore($symbol,$quote) unless(defined( $cache->{$symbol}->{core}));
     
     
     
@@ -361,14 +431,17 @@ sub check_cache {
 
 sub getCore{
 
-  my ($symbol,$data) = @_;
+my ($symbol,$data) = @_;
   my $homex = $self->{result}->{$symbol}->{extended};
      $homex->{quote}=$data;
      
       my @tested = ();
       $symbol = "" unless($symbol);
 
-     /longtrend_backtest[_]$symbol.data$/ && push @tested,[$1,$File::Find::name];
+
+      my $f = $File::Find::name;
+      $f =~ s/Finance*backtest//g;
+     /longtrend_backtest[_]$symbol.data$/ && ($master->{export}->{datafile}->{$1}=$f);
   
   return $homex;
 
@@ -415,7 +488,16 @@ sub tildeexp {
   return $path;
 }
 
+sub  ACCOUNT {
 
+  my $ret = {};
+  `/usr/bin/beancounter update`;
+  $ret->{raw} =`/usr/bin/beancounter status`;
+  
+  
+  return $ret;
+
+}
 
 #my $xml = XML::Simple::XMLout($cache);
 
@@ -423,38 +505,63 @@ sub tildeexp {
 #print XML $xml;
 #close (XML);
 
-      $opts{ob} .= sprintf $coreData;
 
-      printf $opts{ob};
+my @strb = DirContent ($home,"./*");    
 
-=head1 NAME
+$opts{ob} .= sprintf $coreData;
 
-getquotes - get quotes from Yahoo Finance.
+my $account = ACCOUNT();
+
+   
+
+
+
+my @name  = (qw(foo foo2 foo3)) x 20;
+my @last  = (qw(bar bar2 bar3)) x 20;
+my @count = (qw( 3   4    5  )) x 20;
+
+my @sort =  [[values %{$cache->{ranking}}],
+             [keys %{$cache->{ranking}}],
+             [map{($_ = ($_-10000))/100  }keys %{$cache->{ranking}}]];
+my @buffer = [@{$sort[0][0]}];
+
+
+my  $pct     = [map{$_=sprintf("%3.2f%",$_)}@{$sort[0][2]}];
+
+
+
+
+
+print form
+"--------------------------------------------------------------------[INITIAL ACCOUNT 10000USD]-----------------------------------------------------------------",
+"---------------------------------------------------------------------------------------------------------------------------------------------------------------",
+"SYMBOL    BACKTEST-NET        PL_PCT              DATA-FILE                                PDF                               ORDER",
+"---------------------------------------------------------------------------------------------------------------------------------------------------------------",
+"[[[[[[[   [[[[[[[[       |||||||||||||   ||".("|"x30)." ||".("|"x30)." ||".("|"x45)." ||||||".("["x35),
+[@{$sort[0][0]}],[@{$sort[0][1]}],[@$pct],
+ [map {$_ = $master->{export}->{datafile}->{$_} } @{$sort[0][0]}],
+ [map {my $new=$_;  $new=~ s/\.data/\.pdf/g; $_=$new; } @{$sort[0][0]}],
+ [map {my $new=$_;  $new=~ s/^longtrend_backtest_(.*)\.pdf$/$1/g; my $ord = $master->{export}->{list}->{$new}; $ord=~ s/>|\t|\"|_| |\n/#/g; $_ = $ord  } @{$sort[0][0]}];
+
+
+
+#cmd(@tested);
+printf "%s\n%s\n%s",$opts{ob},$account->{raw};
+
+
+
+#print Dumper $master;   
+
+
+1;
+
+__DATA__
+
 
 =head1 SYNOPSIS
 
-  getquotes
-       (gets the default quotes)
-
-  getquotes YHOO VCLK ANDN 
-       (get quotes for Yahoo, ValueClick and Andover Net)
-
-  getquotes --nocache
-       (don't use the cache)
-
-  getquotes --max_cache_age=600 YHOO
-       (cache is valid for 10 minutes (default is 5*60 seconds))
-
-  getquotes --cache_file=/tmp/cache
-       (alternate cache file (default ~/.getquotes.cache))
-
-  getquotes --timeout 10
-       (timeout after 10 seconds instead of the default 3)
-
 
 =head1 TODO
-
-More clued documentation. :)
 
 --help option.
 

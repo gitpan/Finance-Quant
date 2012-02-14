@@ -1,4 +1,5 @@
-Finance::Quant::Base
+Finance-Quant version 0.08
+==================================
 
 The README is used to introduce the module and provide instructions on
 how to install the module, any machine dependencies it may have (for
@@ -26,24 +27,17 @@ SUPPORT AND DOCUMENTATION
 After installing, you can find documentation for this module with the
 perldoc command.
 
-    perldoc Finance::Quant::Base
+    perldoc Finance::Quant
 
 You can also look for information at:
-
-    RT, CPAN's request tracker (report bugs here)
-        http://rt.cpan.org/NoAuth/Bugs.html?Dist=Finance::Quant::Base
 
     Documentation
         http://html5stockbot.com/data/documentation/ibes.html
         http://ibes-check.blogspot.com/
-
-        http://annocpan.org/dist/Finance::Quant::Base
-        
-    CPAN Ratings
-        http://cpanratings.perl.org/d/Finance::Quant::Base
+        http://html5stockbotdotcom.blogspot.com/view/flipcard
 
     Search CPAN
-        http://search.cpan.org/dist/Finance::Quant::Base/
+        http://search.cpan.org/dist/Finance::Quant/
 
 
 LICENSE AND COPYRIGHT
@@ -55,4 +49,61 @@ under the terms of either: the GNU General Public License as published
 by the Free Software Foundation; or the Artistic License.
 
 See http://dev.perl.org/licenses/ for more information.
+
+
+SEE ALSO
+
+  YOU NEED
+  ~~~~~~~~
+  
+  PERL
+  ----
+  Finance::Quant;
+  Finance::Google::Sector::Mean;
+  Finance::NASDAQ::Markets;
+  Finance::Quant::Symbols;
+  GD                   
+  Test::More        
+  Carp
+  Text::Reform    
+  Data::Dumper			
+  File::Spec::Functions		
+  File::Path			
+  Time::Local			
+  File::Fetch			
+  File::Copy			
+  File::Find			
+  Finance::Optical::StrongBuy	
+  Finance::Google::Sector::Mean	
+  Finance::NASDAQ::Markets	
+  HTML::TreeBuilder		
+  Text::Buffer			
+  WWW::Mechanize
+  GraphViz
+  List::Util
+  MIME::Base64
+  GD::Graph::lines
+  Statistics::Basic
+  Thread::Queue
+  Cache::Memcached
+  LWP::UserAgent
+
+  
+  
+
+  UNIX
+  ----
+  >GD
+  >mysql
+  >memcached  
+   
+  R
+  - 
+  >require(quantmod)
+  >require(TTR)
+  >require(blotter)
+  >require(quantmod)
+  >require(quantstrat)
+  >require(PerformanceAnalytics)
+
 

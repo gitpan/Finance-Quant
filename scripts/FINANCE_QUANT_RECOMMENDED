@@ -11,7 +11,14 @@ use Time::HiRes qw(usleep);
 use Cache::Memcached;
 BEGIN { plan tests => 42 }
 
+##getopt
+use Getopt::Std; 
+my %opt =();
+getopt( 'hsdcv', \%opt );
+
 my @symbols = ();
+
+
 
 ###################
 #DONE DATA GOES TO TMP DIRECTORY

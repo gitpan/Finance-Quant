@@ -25,7 +25,7 @@ our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 our @EXPORT = qw(
 new recommended Home updateSymbols
 );
-our $VERSION = '0.08';
+our $VERSION = '0.09';
 use WWW::Mechanize;
 use Carp;
 use File::Copy;
@@ -130,7 +130,7 @@ sub new {
     my $self = bless {
         config=>{'ibes'=>{CUSTOM=>$symbol},sources  => $sources},
         optical=>Finance::Optical::StrongBuy->new($dir),
-        testthread=>testthread->new($dir,10,$downfolder),
+        #testthread=>testthread->new($dir,10,$downfolder),
         downfolder=>$downfolder,
         dir=>$dir,
         date=>$date,
@@ -313,7 +313,7 @@ sub Home {
 #   @symbols = @{} unless(!$data);
 
 
-    File::Path::mkpath(("ratings/bottom","ratings/top","ratings/inbetween","ratings/css"), {
+    File::Path::mkpath(("ratings/bottom","ratings/top","ratings/inbetween","ratings/csv"), {
              verbose => 1,
              mode => 0711,
          } );
@@ -356,7 +356,7 @@ my $memd = new Cache::Memcached {
         }
       
                   
-        my $out = chart::html($sym, $q, $ma, $diff, $self->{'result'}->{$sym}->{'extended'}); 
+        my $out = chart::html($sym, $q, $ma, $diff, $self->{'result'}->{$sym}); 
         
         
         if($out!~/png;base64,["]/){
@@ -663,107 +663,6 @@ sub set_path {
 
 
 
-{
-package testthread;
-use strict;
-use threads;
-use Thread::Queue;
-use Cache::Memcached;
-$|++;
-
-
-  sub new {
-        my $class = shift;
-        my $dir = shift;
-        my $n = shift;
-        my $downfolder = shift;
-
-        $n = 10 unless($n);
-        
-        my $self  = {
-            SYMBOLS       => [],
-            DATA   => {},
-            MEMCACHE=>{},
-            DOWNFOLDER=>$downfolder,
-            DIR=>$dir,
-            THREADS=>$n,
-        };
-        bless ($self, $class);
-
-
-#        $self->{SYMBOLS} =  @{$memd->get("master-run-SYMBOLS")} unless(!$memd->get("master-run-SYMBOLS"));
-
-         
-        $self->{MEMCACHE} = new Cache::Memcached {
-        'servers' => [ "127.0.0.1:11211"],
-        'debug' => 0,
-        'compress_threshold' => 10_000,
-        } or warn($@);
-
-
-        return $self;
-    }
-
-
-sub worker {
-    my $self = shift;
-    my $Q = shift;
-    while( my $workitem = $Q->dequeue ) {
-        print "\nProcessing $workitem";
-
-        my $outfile = sprintf("%s/Finance-Quant/%s/backtest/longtrend_backtest_%s.data",$self->{DIR},$self->{DOWNFOLDER},$workitem);
-      
-        my $cmd = sprintf("sh -c 'cat /usr/local/bin/longtrend-003.r | replace \"AAPL\" \"%s\"  | R --vanilla > %s'",$workitem,$outfile);
-        
-        `$cmd`;
-        
-        my $data = `cat $outfile | egrep  "(Txn.*|Net.*|*.PL|2012*)"`;
-        print "\nProcessing $workitem";
-        
-        
-  }
-  
-  
-}  
-
-sub runner {
-
-  my $self = shift;
-  my $Q = new Thread::Queue;
-
-  $SIG{'INT'} = sub{
-      print "Sigint seen";
-      $Q->dequeue while $Q->pending;
-      $Q->enqueue( (undef) x $self->{THREADS} );
-  };
-
-  $Q->enqueue(reverse @{$self->{SYMBOLS}});
-
-  my @threads = map threads->new( $self->worker($Q) ), 1 .. $self->{THREADS};
-  $Q->enqueue( (undef) x $self->{THREADS} );
-  sleep 0.001 while $Q->pending;
-  $_->join for @threads;
-  
-  exit;
-  }
-
-  sub push_in{
-    my $self = shift;
-    my @symbols = shift;
-    
-    $self->{SYMBOLS}= [@symbols];
-
-    return 1;
-  
-  }
-  sub pop_out{
-    my $self = shift;
-    return pop @{$self->{SYMBOLS}};
-    
-  }
-1;
-}
-
 {package quotes;
 	use LWP::UserAgent;
 	
@@ -778,10 +677,10 @@ sub runner {
 			my @val = split ',', $q;
 			unshift @{$quotes{$header[$_]}}, $val[$_] for 0..$#val;   # unshift instead of push if data listed latest 1st & oldest last
 		}
-		open OUT, ">css/ratings/$symbol.csv";
+		open OUT, ">ratings/csv/$symbol.csv";
 		print OUT $dat;
 		close OUT;
-		print "data written to ratings/$symbol.csv.\n";
+		print "data written to ratings/csv/$symbol.csv.\n";
 		return \%quotes;
 	}
 	sub _fetch {
@@ -815,20 +714,38 @@ sub runner {
 	# $q->{Close} assumed exists in plotlog() & plotdiff()
 	sub html {
 		my ($stock, $q, $ma, $diff,$extended) = @_;
-		print "generating html...\n";
 		my $str = "";
 		my $list = "";
 
 
-		if(defined($extended)) {
-        $list .= Dumper $extended;
+    my @guru =  @{$extended->{'nasdaq-guru'}};
+    my @ext = keys %{$extended->{extended}};
+		my @values = values %{$extended->{extended}};
+    my $xguru ="<h3>Factors</h3><ul>";
+    if(defined($ext[0]))   {
+						my $iu=0;
+#						@ext =@ext[0];
+						foreach my $egu (@ext){
+								$xguru .= sprintf("<li>%s %s</li>",$egu,$extended->{extended}->{$egu});
+								$iu++;
+						}
+    }
+    $xguru .="</ul><h3>check:gurus nasdaq</h3><ul>";
+		foreach my $gu (@guru){
+		    $xguru .= sprintf("<li>raiting:[%s]\t\t%s</li>",$gu->{pct},$gu->{methode});
 		}
+		#	}
+					$str = "<html><head><title>$stock</title></head>".
+									"<body bgcolor=\"#00000\" text=\"ffffff\">".
+									"<div style='float:left;padding:20;'>".$xguru."</div>".
+									"<div style='float:right;'>\n";
 
-		
-		
-		$str .= "<html><head><title>$stock</title></head><body bgcolor=\"#00000\" text=\"ffffff\">".$list."<center>\n";
-		$str .= "<p><img src=\"data:image/png;base64," . plotlog($stock, $q, $ma) . "\"></p>\n";
-    $str .= "<p><img src=\"data:image/png;base64," . plotdiff($stock, $q, $ma, $diff) . "\"></p>\n";
+		$str .= "<p><img src=\"data:image/png;base64," . plotlog($stock, $q, $ma) . "\">\n<br />";
+		$str .= "<img src=\"data:image/png;base64," . plotdiff($stock, $q, $ma, $diff) . "\"></p>\n";
+		#$str .=  _tbl($stock, $q);
+		$str .= "</div></body></html>\n";
+
+
 		$str .=  _tbl($stock, $q);
 		$str .= "</center></body></html>\n";
 		return $str;

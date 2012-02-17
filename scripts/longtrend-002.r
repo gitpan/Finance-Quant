@@ -14,7 +14,7 @@ paste(y,sub,d, sep = "-")
 
 folder <- date()
 
-file<- sprintf("/tmp/Finance-Quant/%s%s",folder,"/charts/chart_backtest_AAPL.pdf")
+file<- sprintf("/tmp/Finance-Quant/%s%s",folder,"/charts/chart_AAPL.pdf")
 
 file
 

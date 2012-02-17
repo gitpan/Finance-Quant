@@ -60,10 +60,29 @@ END  {
 
 1;
 __DATA__
+=head1 NAME
+  
+  FINANCE_QUANT_RECOMMENDED
+  
+=head1 DESCRIPTION
 
-	 
-#HERE WAYS TO KEEP DATA UNDER CONTROLL AND MINIMIZE RECALCULATION
+  FINANCE_QUANT_RECOMMENDED executes a full test
 
-1;
-__DATA__
-#system('for i in `ls /tmp/Finance-Quant/2012-Jan-27-Fri/ibes-strong-buy/ | replace ".jpg" ""`; do perl ~/myperl/charter.pm $i; done');
+=head1 SYNOPSIS
+
+  FINANCE_QUANT_RECOMMENDED
+
+=head1 SEE ALSO
+
+  Finance::Quant  
+  
+=head1 AUTHOR
+
+  Hagen Geissler, E<lt>santex@cpan.org<gt>
+  
+=head1 COPYRIGHT AND LICENSE
+  Copyright (C) 2012 by Hagen Geissler
+  This library is free software; you can redistribute it and/or modify
+  it under the same terms as Perl itself, either Perl version 5.12.4 or,
+  at your option, any later version of Perl 5 you may have available.
+=cut

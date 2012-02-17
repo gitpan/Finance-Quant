@@ -109,6 +109,6 @@ x <- ltportfolio
 y <- ltaccount
 
 x
-y
+#y
 dev.off()
 

@@ -16,8 +16,8 @@ fi
 
 DATABASE='FinanceQuant'
 VERSION='0.8.10'
-DBSYSTEM='PostgreSQL'
-#DBSYSTEM='MySQL'
+#DBSYSTEM='PostgreSQL'
+DBSYSTEM='MySQL'
 SCHEMA_ONLY=0
 
 DAYOFWEEK=$(date +"%u")
@@ -134,6 +134,28 @@ function create_mysql_tables
 	UNIQUE KEY cash_pkey(name,type,owner,date)
     ) TYPE=MyISAM;
     \q
+    
+CREATE TABLE orders (
+  id int(10) unsigned NOT NULL DEFAULT '0',
+  symbol varchar(128) NOT NULL,
+  orderId int(5) DEFAULT '0',
+  type enum('unknown','BUY','SELL') NOT NULL DEFAULT 'unknown',
+  clientId smallint(3) DEFAULT '0',
+  permId bigint(9) DEFAULT '0',
+  status varchar(32) NOT NULL,
+  filled int(7) NOT NULL DEFAULT '0',
+  remaining int(7) DEFAULT '0',
+  avgFillPrice double NOT NULL DEFAULT '0',
+  lastFillPrice double DEFAULT '0',
+  parent tinyint(3) NOT NULL DEFAULT '0',
+  whyHeld varchar(32) NOT NULL,
+  changedDate date NOT NULL,
+  shares int(11) NOT NULL DEFAULT '0',
+  password varchar(32) NOT NULL,
+  UNIQUE KEY symbol_x (symbol,type,changedDate)
+) ENGINE=MyISAM;
+\q    
+    
 EOF
 }
 
@@ -535,36 +557,6 @@ if [ "$DBSYSTEM" = "PostgreSQL" ] || [ "$DBSYSTEM" = "MySQL" ]; then
     set -e
 fi
 
-# insert the DJIA stocks into the indices table
-echo "Filling $DATABASE database tables with DJIA stocks"
-#execute "$FinanceQuant addindex DJIA $DJIA"
-
-# create an example of tech stocks
-echo "Filling $DATABASE (sample) portfolio"
-#execute "$FinanceQuant addportfolio CSCO:50:USD NT.TO:100:CAD SIE.DE:10:EUR CGE.PA:50:EUR"
-#execute "$FinanceQuant addportfolio IBM:50:USD XOM:75:USD C:100:USD GOOG:25:USD"
-
-echo -n "Filling $DATABASE with stock info and most recent prices "
-#echo "for DJIA stocks"
-#execute "$FinanceQuant addstock $DJIA ^GSPC"
-
-echo "Filling $DATABASE with historical prices for example portfolio stocks"
-#execute "$FinanceQuant backpopulate --prevdate '1 year ago' --date '$LASTBIZDAY' CSCO NT.TO SIE.DE CGE.PA"
-#execute "$FinanceQuant backpopulate --prevdate '1 year ago' --date '$LASTBIZDAY' IBM XOM C GOOG ^GSPC"
-
-echo "Filling $DATABASE with historical fx prices for EUR and CAD"
-#execute "$FinanceQuant fxbackpopulate --ubcfx --prevdate '1 year ago' --date '$LASTBIZDAY' EUR CAD"
-
-echo "Running portfolio pl report on (sample) portfolio"
-#execute "$FinanceQuant plreport --date '$LASTBIZDAY'"
-
-# dayendreport needs a db entry previous price which we don't get from 
-# all backpop routines / data combinations
-#echo "Running portfolio dayendreport on (sample) portfolio"
-#execute "$FinanceQuant dayendreport --date '$LASTBIZDAY'"
-
-echo "Running portfolio riskreport on (sample) portfolio"
-#execute "$FinanceQuant risk --date '$LASTBIZDAY'"
 
 echo "Done."
 exit 0

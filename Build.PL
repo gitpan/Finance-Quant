@@ -35,6 +35,7 @@ my $build = Module::Build->new(
     'Thread::Queue'=>0,
     'Cache::Memcached'=>0,
     'LWP::UserAgent'=>0,
+    'threads'=>0,
 
     },
     recommends        => {

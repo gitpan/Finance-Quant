@@ -568,18 +568,7 @@ use MIME::Base64;
 
 # a 32 X 32 png
 my $icodata = decode_base64(
-      'iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAAGXcA1uAAAABGdBTUEAALGPC/xhBQAAAAZiS0dE
-AP8A/wD/oL2nkwAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAd0SU1FB9wBDgQJDdztR18AAAAZdEVY
-dENvbW1lbnQAQ3JlYXRlZCB3aXRoIEdJTVBXgQ4XAAAB1ElEQVRIx81VzUrrQBT+kjpOzI10k51u
-3IobC14o6CwD+hAupCt9Aym4KPQRXPkG3VsYcDMK3RXkvoK7m02o2LFpGRd1YqeZxLYqeCCQMN93
-vvMz58QJKFV4N1e/nLYpnNkTxwrLfRgwABhIiU3Pm6J6YQgAGPIUm543RQSUqoBS1W61lH4PKFU5
-V1bBgZQ4YgwAsDZ74EcUB711M6oJU6gIpzhcQ2MgZf5kNsT5p91qKaXUYmloO2IM90KY0g3fzwEn
-TGHIU9wLgetqFTVC8kn0whB/d/9j1BxjIyJWRYOgk8z6YSMAKM2hVGERc8sObX0oJHQ5t5IKCcdR
-hAchcgUozeFZvuLf9hbqcfyhUCMka8o8OPAo6nGcjQAAuP00RcP3DZIGazMUAOA8STLSPLiwSudJ
-gj/1einYIHQ5xy3n2Wwt1Gk97KWEH79Ly5q7KvGy2cRASvue+A6B2eKXNeJLJZowhRohqAgH/TT9
-vgwmTOFZvmLUHOPxboyG76MXhtYRyTK4rlaxTwgukqQwmukiHKEiXOuO08vz5uWluEQ2oc8cr3RN
-tdBZJ0Y/TZd2/GkPdjod7D09IbxiKzu3ZtDlHIeWa3cSRcYf69dM8tK7ZVl7A9Acz+IZAc0kAAAA
-AElFTkSuQmCC'
+      'iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAAGXcA1uAAAABGdBTUEAALGPC/xhBQAAAAZiS0dEAP8A/wD/oL2nkwAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAd0SU1FB9wBDgQJDdztR18AAAAZdEVYdENvbW1lbnQAQ3JlYXRlZCB3aXRoIEdJTVBXgQ4XAAAB1ElEQVRIx81VzUrrQBT+kjpOzI10k51u3IobC14o6CwD+hAupCt9Aym4KPQRXPkG3VsYcDMK3RXkvoK7m02o2LFpGRd1YqeZxLYqeCCQMN93vvMz58QJKFV4N1e/nLYpnNkTxwrLfRgwABhIiU3Pm6J6YQgAGPIUm543RQSUqoBS1W61lH4PKFU5V1bBgZQ4YgwAsDZ74EcUB711M6oJU6gIpzhcQ2MgZf5kNsT5p91qKaXUYmloO2IM90KY0g3fzwEnTGHIU9wLgetqFTVC8kn0whB/d/9j1BxjIyJWRYOgk8z6YSMAKM2hVGERc8sObX0oJHQ5t5IKCcdRhAchcgUozeFZvuLf9hbqcfyhUCMka8o8OPAo6nGcjQAAuP00RcP3DZIGazMUAOA8STLSPLiwSudJgj/1einYIHQ5xy3n2Wwt1Gk97KWEH79Ly5q7KvGy2cRASvue+A6B2eKXNeJLJZowhRohqAgH/TT9vgwmTOFZvmLUHOPxboyG76MXhtYRyTK4rlaxTwgukqQwmukiHKEiXOuO08vz5uWluEQ2oc8cr3RNtdBZJ0Y/TZd2/GkPdjod7D09IbxiKzu3ZtDlHIeWa3cSRcYf69dM8tK7ZVl7A9Acz+IZAc0kAAAAAElFTkSuQmCC'
    );
 
 my $icopixbuf = do {
@@ -640,7 +629,7 @@ $vbox->show_all;
 
 # messageTypes: info warning question error
 
-my $id3 = Glib::Timeout->add (2000, sub {
+my $id3 = Glib::Timeout->add (10000, sub {
 
    my ($screen,$rect)=$statusicon->get_geometry;
    my ($x,$y,$w, $h) = $rect->values;
@@ -648,10 +637,12 @@ my $id3 = Glib::Timeout->add (2000, sub {
   my @message = ();
 
   my $reports=`tree /tmp/Finance-Quant/ | egrep -c '*html'`;  
-  my $bt=`tree /tmp/Finance-Quant/ | egrep -c '*pdf'`;
+  my $bt=`tree /tmp/Finance-Quant/ | egrep -c '*data'`;
   my $stb=`tree -f /tmp/Finance-Quant/ | egrep -c 'ibes-strong-buy'`;
   my $symbols = `tree /tmp/Finance-Quant/ | egrep directories`;
+  my $charts=`tree -f /tmp/Finance-Quant/ | egrep -c 'charts'`;
   
+
  # $symbols =~ s/^(.*)directories, (.*)files/$2/;
   
   
@@ -660,8 +651,8 @@ my $id3 = Glib::Timeout->add (2000, sub {
       type          => 'popup',
       #   parent_widget => $window, # undefind, use x y location
       "messageType"   => "info",
-      "timeout"       => 2000,
-      "message"       => "".($symbols)."strong buy:".($stb-1)."\nbacktests:".$bt."reports:".$reports,
+      "timeout"       => 10000,
+      "message"       => "".($symbols)."strong buy:".($stb-1)."\nbacktests:".$bt."reports:".$reports." charts:".$charts,
       "x"             => ($x + $w/2),
       "y"             => ($y + $h ),
    );
@@ -772,3 +763,32 @@ my $menu = menu();
 }
 
 1;
+
+
+__DATA__
+=head1 NAME
+  
+  FINANCE_QUANT_TRAY
+  
+=head1 DESCRIPTION
+
+  TRAY icon displaying calculation progress
+
+=head1 SYNOPSIS
+
+  FINANCE_QUANT_TRAY
+
+=head1 SEE ALSO
+
+  part of Finance::Quant  
+  
+=head1 AUTHOR
+
+  Hagen Geissler, E<lt>santex@cpan.org<gt>
+  
+=head1 COPYRIGHT AND LICENSE
+  Copyright (C) 2012 by Hagen Geissler
+  This library is free software; you can redistribute it and/or modify
+  it under the same terms as Perl itself, either Perl version 5.12.4 or,
+  at your option, any later version of Perl 5 you may have available.
+=cut

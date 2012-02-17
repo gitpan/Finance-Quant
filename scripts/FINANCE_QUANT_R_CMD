@@ -36,16 +36,18 @@ sub worker {
       while( my $workitem = $Q->dequeue ) {
           print "Processing $workitem";
           
-          
-  my $cmd = sprintf("sh -c 'cat %s | replace \"AAPL\" \"%s\"  | R --vanilla > %s/Finance-Quant/%s/backtest/longtrend_backtest_%s.data'","/usr/local/bin/longtrend-003.r",$workitem,$dir,$downfolder,$workitem);
-  print "\n".$cmd,"\n";
-  my $data = `$cmd`;
+  my $cmd = sprintf("sh -c 'cat %s | replace \"AAPL\" \"%s\"  | R --vanilla'","/usr/local/bin/longtrend-002.r",$workitem);
+  `$cmd`;
+
+ $cmd = sprintf("sh -c 'cat %s | replace \"AAPL\" \"%s\"  | R --vanilla > %s/Finance-Quant/%s/backtest/longtrend_backtest_%s.data'","/usr/local/bin/longtrend-003.r",$workitem,$dir,$downfolder,$workitem);
+#  print "\n".$cmdx,"\n";
+`$cmd`;
 
           
       }
   }
 
-  our $THREADS = 35; 
+  our $THREADS = 50; 
 
 my $Q = new Thread::Queue;
 
@@ -62,165 +64,33 @@ $Q->enqueue( (undef) x $THREADS );
 sleep 1 while $Q->pending;
 $_->join for @threads;
 
-__DATA__
-WorkItem 1
-WorkItem 2
-WorkItem 3
-WorkItem 4
-WorkItem 5
-WorkItem 6
-WorkItem 7
-WorkItem 8
-WorkItem 9
-WorkItem 10
-
-
-__DATA__
-#!/usr/bin/perl
-use strict;
-use threads;
-use Thread::Queue;
-use Data::Dumper;
-use File::Spec;
-use Cache::Memcached;
-use Finance::Quant;
-use Finance::Quant::Quotes;
-use Finance::Quant::Charter;
-#use Test;
-$|++;
-
-#BEGIN { plan tests => 42 }
-  my $dir = File::Spec->tmpdir();
-  my $date = gmtime;
-  my @e = split " ",$date;# =~ s/ /_/g;
-  
-  if(defined($e[2]) && (length $e[2]) == 1) {
-    $e[2] = "0".$e[2];
-  }
-  
-  my $downfolder = "$e[4]-$e[1]-$e[2]";
-
-
-
-my $home = undef;
-$SIG{CHLD} = 'IGNORE';
-# my $a;
-$ARGV[0] = "AAPL" unless($ARGV[0]);
-       $home = Finance::Quant->new($ARGV[0]);
-       $home->createDataDir();
-       $home->Home($home->{config});
-
-
-
-my $memd = new Cache::Memcached {
-'servers' => [ "127.0.0.1:11211"],
-'debug' => 0,
-'compress_threshold' => 10_000,
-} or warn($@);
-
-
-chdir($dir);
-
-
-my @symbols = @{$memd->get("master-run-SYMBOLS")};
-my ($cmd,$data,$i,$chain )=(undef,undef,0,"");
-
-
-
-sub worker {
-    my( $Q ) = @_;
-    while( my $workitem = $Q->dequeue ) {
-        print "Processing $workitem";
-        sleep rand 1;
-    }
-}
-
-our $THREADS = 50;
-
-my $Q = new Thread::Queue;
-
-$SIG{'INT'} = sub{
-    print "Sigint seen";
-    $Q->dequeue while $Q->pending;
-    $Q->enqueue( (undef) x $THREADS );
-};
-
-$Q->enqueue(@symbols);
-
-my @threads = map threads->new( \&worker, $Q ), 1 .. $THREADS;
-$Q->enqueue( (undef) x $THREADS );
-sleep 0.001 while $Q->pending;
-$_->join for @threads;
-
-
-
-
-__DATA__
-
-
-
-
-if($i>5){
-print $chain."\n";
-$chain="";
-$i = 0;
-sleep(1);
-
-}
-
-$i++;
-$chain .= sprintf(" %s",$_);
-print $_."\n";
-
-$cmd = sprintf("sh -c 'cat %s | replace \"AAPL\" \"%s\"  | R --vanilla > %s/Finance-Quant/%s/backtest/longtrend_backtest_%s.data'","/usr/local/bin/longtrend-003.r",$_,$dir,$downfolder,$_);
-print "\n".$cmd,"\n";
-$data = `$cmd`;
-
-
-use Finance::Quant::Quotes;
-use Finance::Quant::Charter;
-                   
-        my $result;
-        my ($stocksymbol, $startdate, $enddate, $interval, $agent,$ma, $diff) = ($_ ,"6-15-2011","6-30-2018","d","Mozilla/4.0",20, 1);
-
-        my $q = get($stocksymbol, $startdate, $enddate, $interval, $agent);
-#        print Dumper [$q];
-       
-        my $out = html($stocksymbol, $q, $ma, $diff); 
-        
-        
-        if($out!~/png;base64,["]/){
-        
-        my $check = diffcheck($stocksymbol, $q, $ma, $diff);
-        
-        
-        if($check==1){
-        open OUT,sprintf(">%s/raw-data/bottom/$stocksymbol.html",$dir);
-        print OUT $out;
-        close OUT;
-        print "done: $stocksymbol.html generated.\n";
-        }elsif($check==2){
-        open OUT,sprintf(">%s/raw-data/top/$stocksymbol.html",$dir);
-        print OUT $out;
-        close OUT;
-        print "done: TOP-$stocksymbol.html generated.\n";
-        
-        }elsif($check==0){
-        open OUT,sprintf(">%s/raw-data/inbetween/$stocksymbol.html",$dir);
-        print OUT $out;
-        close OUT;
-        print "done: $stocksymbol.html generated.\n";
-            
-        }
-        
-        }
-
-
-#$cmd = sprintf("cp /tmp/*.pdf /tmp/Finance-Quant/2012-Feb-6-Mon/backtest/longtrend_backtest_%s.pdf",$_);
-
-#print `$cmd`;
-
-}
-
 
 1;
+
+__DATA__
+=head1 NAME
+  
+  FINANCE_QUANT_R_CMD
+  
+=head1 DESCRIPTION
+
+  Thread::Queue for executing strategy and chart
+
+=head1 SYNOPSIS
+
+  FINANCE_QUANT_R_CMD
+
+=head1 SEE ALSO
+
+  part of Finance::Quant  
+  
+=head1 AUTHOR
+
+  Hagen Geissler, E<lt>santex@cpan.org<gt>
+  
+=head1 COPYRIGHT AND LICENSE
+  Copyright (C) 2012 by Hagen Geissler
+  This library is free software; you can redistribute it and/or modify
+  it under the same terms as Perl itself, either Perl version 5.12.4 or,
+  at your option, any later version of Perl 5 you may have available.
+=cut
